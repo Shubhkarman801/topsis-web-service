@@ -8,6 +8,9 @@ from flask import Flask, render_template, request
 from email.message import EmailMessage
 import uuid
 import requests
+import base64
+
+
 
 UPLOAD_FOLDER = "uploads"
 RESULT_FOLDER = "results"
@@ -25,33 +28,37 @@ def send_email(receiver, attachment_path):
     if not api_key:
         raise Exception("RESEND_API_KEY not set")
 
+    # Read and encode file
     with open(attachment_path, "rb") as f:
-        file_bytes = f.read()
+        encoded_file = base64.b64encode(f.read()).decode("utf-8")
 
-    files = {
-        "file": ("result.csv", file_bytes)
-    }
-
-    data = {
+    payload = {
         "from": "TOPSIS <onboarding@resend.dev>",
-        "to": receiver,
+        "to": [receiver],
         "subject": "Your TOPSIS Result",
-        "html": "<p>Your TOPSIS result file is attached.</p>"
+        "html": "<p>Your TOPSIS result file is attached.</p>",
+        "attachments": [
+            {
+                "filename": "result.csv",
+                "content": encoded_file
+            }
+        ]
     }
 
     headers = {
-        "Authorization": f"Bearer {api_key}"
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
     }
 
     response = requests.post(
         "https://api.resend.com/emails",
         headers=headers,
-        data=data,
-        files=files
+        json=payload
     )
 
-    if response.status_code not in [200, 201]:
+    if response.status_code not in (200, 201):
         raise Exception(f"Email failed: {response.text}")
+
 
 
 @app.route("/", methods=["GET", "POST"])
