@@ -1,14 +1,13 @@
 import os
 import re
-import smtplib
 import pandas as pd
 import numpy as np
 from topsis_shubhkarman_102303661 import topsis_core
 from flask import Flask, render_template, request
-from email.message import EmailMessage
-import uuid
 import requests
 import base64
+import uuid
+
 
 
 
@@ -24,40 +23,52 @@ def run_topsis(input_file, weights_str, impacts_str, output_file):
     topsis_core(input_file, weights_str, impacts_str, output_file)
 
 def send_email(receiver, attachment_path):
-    api_key = os.environ.get("RESEND_API_KEY")
-    if not api_key:
-        raise Exception("RESEND_API_KEY not set")
+    api_key = os.environ.get("MAILJET_API_KEY")
+    secret_key = os.environ.get("MAILJET_SECRET_KEY")
 
-    # Read and encode file
+    if not api_key or not secret_key:
+        raise Exception("Mailjet API keys not set")
+
     with open(attachment_path, "rb") as f:
         encoded_file = base64.b64encode(f.read()).decode("utf-8")
 
+    url = "https://api.mailjet.com/v3.1/send"
+
     payload = {
-        "from": "TOPSIS <onboarding@resend.dev>",
-        "to": [receiver],
-        "subject": "Your TOPSIS Result",
-        "html": "<p>Your TOPSIS result file is attached.</p>",
-        "attachments": [
+        "Messages": [
             {
-                "filename": "result.csv",
-                "content": encoded_file
+                "From": {
+                    "Email": "ssingh20_be23@thapar.edu",  # <-- MUST BE VERIFIED IN MAILJET
+                    "Name": "TOPSIS Tool"
+                },
+                "To": [
+                    {
+                        "Email": receiver,
+                        "Name": "User"
+                    }
+                ],
+                "Subject": "Your TOPSIS Result",
+                "TextPart": "Your TOPSIS result file is attached.",
+                "Attachments": [
+                    {
+                        "ContentType": "text/csv",
+                        "Filename": "result.csv",
+                        "Base64Content": encoded_file
+                    }
+                ]
             }
         ]
     }
 
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-
     response = requests.post(
-        "https://api.resend.com/emails",
-        headers=headers,
+        url,
+        auth=(api_key, secret_key),
         json=payload
     )
 
     if response.status_code not in (200, 201):
         raise Exception(f"Email failed: {response.text}")
+
 
 
 
