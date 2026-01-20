@@ -7,6 +7,7 @@ from topsis_shubhkarman_102303661 import topsis_core
 from flask import Flask, render_template, request
 from email.message import EmailMessage
 import uuid
+import requests
 
 UPLOAD_FOLDER = "uploads"
 RESULT_FOLDER = "results"
@@ -20,29 +21,38 @@ def run_topsis(input_file, weights_str, impacts_str, output_file):
     topsis_core(input_file, weights_str, impacts_str, output_file)
 
 def send_email(receiver, attachment_path):
-    sender = os.environ.get("EMAIL_USER")
-    password = os.environ.get("EMAIL_PASS")
-
-    if not sender or not password:
-        raise Exception("Email credentials not set")
-
-    msg = EmailMessage()
-    msg["Subject"] = "TOPSIS Result"
-    msg["From"] = sender
-    msg["To"] = receiver
-    msg.set_content("Your TOPSIS result file is attached.")
+    api_key = os.environ.get("RESEND_API_KEY")
+    if not api_key:
+        raise Exception("RESEND_API_KEY not set")
 
     with open(attachment_path, "rb") as f:
-        msg.add_attachment(
-            f.read(),
-            maintype="application",
-            subtype="octet-stream",
-            filename="result.csv"
-        )
+        file_bytes = f.read()
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(sender, password)
-        server.send_message(msg)
+    files = {
+        "file": ("result.csv", file_bytes)
+    }
+
+    data = {
+        "from": "TOPSIS <onboarding@resend.dev>",
+        "to": receiver,
+        "subject": "Your TOPSIS Result",
+        "html": "<p>Your TOPSIS result file is attached.</p>"
+    }
+
+    headers = {
+        "Authorization": f"Bearer {api_key}"
+    }
+
+    response = requests.post(
+        "https://api.resend.com/emails",
+        headers=headers,
+        data=data,
+        files=files
+    )
+
+    if response.status_code not in [200, 201]:
+        raise Exception(f"Email failed: {response.text}")
+
 
 @app.route("/", methods=["GET", "POST"])
 def index():
