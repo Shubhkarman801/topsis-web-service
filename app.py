@@ -3,6 +3,7 @@ import re
 import smtplib
 import pandas as pd
 import numpy as np
+from topsis_shubhkarman_102303661 import topsis_core
 from flask import Flask, render_template, request
 from email.message import EmailMessage
 import uuid
@@ -16,48 +17,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 def run_topsis(input_file, weights_str, impacts_str, output_file):
-    df = pd.read_csv(input_file)
-
-    if df.shape[1] < 3:
-        raise Exception("CSV must have at least 3 columns")
-
-    data = df.iloc[:, 1:].astype(float)
-
-    weights = np.array(list(map(float, weights_str.split(","))))
-    weights = weights / weights.sum()
-
-    impacts = impacts_str.split(",")
-
-    if len(weights) != len(impacts) or len(weights) != data.shape[1]:
-        raise Exception("Weights, impacts, and columns must match")
-
-    for i in impacts:
-        if i not in ["+", "-"]:
-            raise Exception("Impacts must be + or -")
-
-    norm = data / np.sqrt((data ** 2).sum())
-    weighted = norm * weights
-
-    ideal_best = []
-    ideal_worst = []
-
-    for i, col in enumerate(weighted.columns):
-        if impacts[i] == "+":
-            ideal_best.append(weighted[col].max())
-            ideal_worst.append(weighted[col].min())
-        else:
-            ideal_best.append(weighted[col].min())
-            ideal_worst.append(weighted[col].max())
-
-    dist_best = np.sqrt(((weighted - ideal_best) ** 2).sum(axis=1))
-    dist_worst = np.sqrt(((weighted - ideal_worst) ** 2).sum(axis=1))
-
-    score = dist_worst / (dist_best + dist_worst)
-
-    df["Topsis Score"] = score
-    df["Rank"] = df["Topsis Score"].rank(ascending=False, method="max").astype(int)
-
-    df.to_csv(output_file, index=False)
+    topsis_core(input_file, weights_str, impacts_str, output_file)
 
 def send_email(receiver, attachment_path):
     sender = os.environ.get("EMAIL_USER")
